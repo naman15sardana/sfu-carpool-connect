@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, MapPin, Calendar, Users } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toast } from "sonner";
+import { toast } from "@/hooks/use-toast";
 
 const CreateRoute = () => {
   const navigate = useNavigate();
@@ -26,15 +26,21 @@ const CreateRoute = () => {
       };
 
       const existingRoutes = JSON.parse(localStorage.getItem("routes") || "[]");
-      localStorage.setItem("routes", JSON.stringify([...existingRoutes, newRoute]));
+      // Add new route at the beginning so it appears first
+      localStorage.setItem("routes", JSON.stringify([newRoute, ...existingRoutes]));
       
-      toast.success("Route published successfully!", {
-        description: "Students can now find and join your ride."
+      toast({
+        title: "Route published successfully!",
+        description: "Students can now find and join your ride.",
       });
       
       setTimeout(() => navigate("/browse-routes"), 1500);
     } else {
-      toast.error("Please fill in all fields");
+      toast({
+        title: "Error",
+        description: "Please fill in all fields",
+        variant: "destructive",
+      });
     }
   };
 
