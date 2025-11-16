@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, MapPin, Clock, Users, User } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { toast } from "sonner";
+import { toast } from "@/hooks/use-toast";
 
 interface Route {
   id: number;
@@ -20,7 +20,7 @@ const BrowseRoutes = () => {
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
 
   useEffect(() => {
-    // Load routes from localStorage or use default ones
+    // Load routes from localStorage first, then add defaults
     const savedRoutes = JSON.parse(localStorage.getItem("routes") || "[]");
     
     const defaultRoutes: Route[] = [
@@ -50,7 +50,8 @@ const BrowseRoutes = () => {
       },
     ];
 
-    const allRoutes = [...defaultRoutes, ...savedRoutes];
+    // Put saved routes first so new ones appear at the top
+    const allRoutes = [...savedRoutes, ...defaultRoutes];
     setRoutes(allRoutes);
   }, []);
 
@@ -65,8 +66,9 @@ const BrowseRoutes = () => {
   };
 
   const handleJoinRoute = (route: Route) => {
-    toast.success("Request sent!", {
-      description: `${route.driver} will be notified of your request.`
+    toast({
+      title: "Request sent!",
+      description: `${route.driver} will be notified of your request.`,
     });
     setSelectedRoute(null);
   };

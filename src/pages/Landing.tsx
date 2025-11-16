@@ -8,6 +8,23 @@ const Landing = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Navigation Header */}
+      <header className="border-b border-border/50 glass sticky top-0 z-50">
+        <div className="container mx-auto px-6 py-4 flex justify-between items-center">
+          <h2 className="text-xl font-bold">
+            Smart <span className="text-gradient">Carpool</span>
+          </h2>
+          <Button 
+            variant="neon" 
+            size="sm"
+            onClick={() => navigate("/login")}
+            className="gap-2"
+          >
+            Sign In
+          </Button>
+        </div>
+      </header>
+
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-primary/20 via-transparent to-transparent opacity-50" />
@@ -139,12 +156,6 @@ const Landing = () => {
               </button>
               <button className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                 Contact
-              </button>
-              <button 
-                onClick={() => navigate("/login")}
-                className="text-sm text-primary hover:text-primary/80 transition-colors font-medium"
-              >
-                Sign In
               </button>
             </div>
           </div>
