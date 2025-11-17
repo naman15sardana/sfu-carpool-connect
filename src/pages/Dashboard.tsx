@@ -19,7 +19,7 @@ const Dashboard = () => {
   const [userName, setUserName] = useState<string | null>(null);
   const [rides, setRides] = useState<Ride[]>([]);
 
-  // 🔥 Load authenticated user + their routes
+  // 🔥 Load authenticated user + their posted rides
   useEffect(() => {
     const loadUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -29,13 +29,13 @@ const Dashboard = () => {
         return;
       }
 
-      setUserName(user.email); // or user.user_metadata.full_name
+      setUserName(user.email);
 
-      // Load user's published rides
+      // 🔥 FIX: use driver_id instead of user_id
       const { data, error } = await supabase
         .from("rides")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("driver_id", user.id)   // ✅ CORRECT FIELD
         .order("date", { ascending: true })
         .order("time", { ascending: true });
 
@@ -55,12 +55,13 @@ const Dashboard = () => {
     loadUser();
   }, [navigate]);
 
-  // 🔥 Log out using Supabase
+  // 🔥 Logout
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/");
   };
 
+  // Helper for formatting date/time
   const formatDateTime = (date: string, time: string) => {
     const d = new Date(`${date}T${time}`);
     return d.toLocaleString("en-US", {
@@ -157,7 +158,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* 🔥 YOUR POSTED ROUTES (REAL DATA) */}
+        {/* 🔥 YOUR POSTED ROUTES */}
         <div className="mt-16">
           <h2 className="text-2xl font-bold mb-4">Your Published Routes</h2>
 

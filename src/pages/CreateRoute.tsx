@@ -4,7 +4,13 @@ import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, MapPin, Calendar, Users } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "../lib/supabase";
 
@@ -15,6 +21,9 @@ const CreateRoute = () => {
   const [departureTime, setDepartureTime] = useState("");
   const [seats, setSeats] = useState("");
 
+  // -------------------------------
+  // 🔥 CREATE ROUTE SUBMIT HANDLER
+  // -------------------------------
   const handleSubmit = async () => {
     if (!startLocation || !destination || !departureTime || !seats) {
       toast({
@@ -25,7 +34,7 @@ const CreateRoute = () => {
       return;
     }
 
-    // Get logged in user
+    // 🔥 Get logged in user
     const { data: userData } = await supabase.auth.getUser();
     const user = userData.user;
 
@@ -38,14 +47,22 @@ const CreateRoute = () => {
       return;
     }
 
+    // -------------------------------
+    // 🔥 Convert datetime-local → date + time
+    // -------------------------------
     const iso = departureTime; // "YYYY-MM-DDTHH:MM"
+    const date = iso.split("T")[0];
+    const time = iso.split("T")[1];
 
+    // -------------------------------
+    // 🔥 Insert into Supabase
+    // -------------------------------
     const { error } = await supabase.from("rides").insert({
-      driver_id: user.id,
-      from_location: startLocation,
-      to_location: destination,
-      date: iso.split("T")[0],  // YYYY-MM-DD
-      time: iso.split("T")[1],  // HH:MM
+      driver_id: user.id,          
+      start_location: startLocation,
+      end_location: destination,
+      date: date,
+      time: time,
       seats_available: Number(seats),
     });
 
@@ -59,8 +76,8 @@ const CreateRoute = () => {
     }
 
     toast({
-      title: "Route published successfully!",
-      description: "Students can now find and join your ride.",
+      title: "Route Published!",
+      description: "Your ride is now visible to other students.",
     });
 
     setTimeout(() => navigate("/browse-routes"), 1200);
@@ -70,8 +87,8 @@ const CreateRoute = () => {
     <div className="min-h-screen bg-background">
       <header className="border-b border-border/50 glass sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             onClick={() => navigate("/dashboard")}
             className="gap-2"
           >
@@ -100,7 +117,7 @@ const CreateRoute = () => {
               Starting Location
             </Label>
             <Input
-              placeholder="e.g., Downtown Vancouver"
+              placeholder="e.g., Surrey Central Station"
               value={startLocation}
               onChange={(e) => setStartLocation(e.target.value)}
             />
@@ -161,8 +178,8 @@ const CreateRoute = () => {
           </div>
 
           {/* Submit */}
-          <Button 
-            size="lg" 
+          <Button
+            size="lg"
             variant="neon"
             className="w-full gap-2"
             onClick={handleSubmit}
@@ -170,7 +187,6 @@ const CreateRoute = () => {
             <MapPin className="w-5 h-5" />
             Publish Route
           </Button>
-
         </div>
       </div>
     </div>
