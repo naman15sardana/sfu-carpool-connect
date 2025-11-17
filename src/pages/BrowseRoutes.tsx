@@ -4,60 +4,61 @@ import { ArrowLeft, MapPin, Clock, Users, User } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "../lib/supabase";
 
 interface Route {
   id: number;
-  from: string;
-  to: string;
+  start_location: string;
+  end_location: string;
+  date: string;
   time: string;
   seats: number;
-  driver: string;
+  user_id: string;
+  users?: { email: string } | null; // <-- Added (driver email)
 }
 
 const BrowseRoutes = () => {
   const navigate = useNavigate();
+
   const [routes, setRoutes] = useState<Route[]>([]);
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
 
   useEffect(() => {
-    // Load routes from localStorage first, then add defaults
-    const savedRoutes = JSON.parse(localStorage.getItem("routes") || "[]");
-    
-    const defaultRoutes: Route[] = [
-      {
-        id: 1,
-        from: "Downtown Vancouver",
-        to: "SFU Burnaby",
-        time: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString().slice(0, 16),
-        seats: 3,
-        driver: "Alex Chen",
-      },
-      {
-        id: 2,
-        from: "Surrey Central",
-        to: "SFU Surrey",
-        time: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 16),
-        seats: 2,
-        driver: "Sarah Johnson",
-      },
-      {
-        id: 3,
-        from: "Metrotown",
-        to: "SFU Burnaby",
-        time: new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString().slice(0, 16),
-        seats: 4,
-        driver: "Michael Kim",
-      },
-    ];
+    const fetchRoutes = async () => {
+      const { data, error } = await supabase
+        .from("rides")
+        .select(`
+          id,
+          start_location,
+          end_location,
+          date,
+          time,
+          seats,
+          user_id,
+          users ( email )
+        `)
+        .order("date", { ascending: true })
+        .order("time", { ascending: true });
 
-    // Put saved routes first so new ones appear at the top
-    const allRoutes = [...savedRoutes, ...defaultRoutes];
-    setRoutes(allRoutes);
+      if (error) {
+        console.error(error);
+        toast({
+          title: "Error loading routes",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setRoutes((data ?? []) as Route[]);
+    };
+
+    fetchRoutes();
   }, []);
 
-  const formatTime = (timeString: string) => {
-    const date = new Date(timeString);
-    return date.toLocaleString("en-US", {
+  const formatDateTime = (date: string, time: string) => {
+    const combined = new Date(`${date}T${time}`);
+    return combined.toLocaleString("en-US", {
       month: "short",
       day: "numeric",
       hour: "numeric",
@@ -68,7 +69,7 @@ const BrowseRoutes = () => {
   const handleJoinRoute = (route: Route) => {
     toast({
       title: "Request sent!",
-      description: `${route.driver} will be notified of your request.`,
+      description: `Driver (${route.users?.email}) will be notified.`,
     });
     setSelectedRoute(null);
   };
@@ -107,48 +108,55 @@ const BrowseRoutes = () => {
               className="glass p-6 rounded-2xl border border-border/50 hover:border-primary/50 hover:neon-glow transition-all duration-300 cursor-pointer group"
               onClick={() => setSelectedRoute(route)}
             >
-              {/* Route Info */}
               <div className="space-y-4">
-                {/* From → To */}
+                
+                {/* From */}
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center">
                     <MapPin className="w-5 h-5 text-primary" />
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div>
                     <div className="text-sm text-muted-foreground">From</div>
-                    <div className="font-semibold truncate">{route.from}</div>
+                    <div className="font-semibold truncate">
+                      {route.start_location}
+                    </div>
                   </div>
                 </div>
 
+                {/* To */}
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-secondary/20 flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded-lg bg-secondary/20 flex items-center justify-center">
                     <MapPin className="w-5 h-5 text-secondary" />
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div>
                     <div className="text-sm text-muted-foreground">To</div>
-                    <div className="font-semibold truncate">{route.to}</div>
+                    <div className="font-semibold truncate">
+                      {route.end_location}
+                    </div>
                   </div>
                 </div>
 
                 {/* Time */}
                 <div className="flex items-center gap-2 text-sm">
                   <Clock className="w-4 h-4 text-accent" />
-                  <span className="text-muted-foreground">{formatTime(route.time)}</span>
+                  <span className="text-muted-foreground">
+                    {formatDateTime(route.date, route.time)}
+                  </span>
                 </div>
 
-                {/* Seats & Driver */}
+                {/* Seats + Driver */}
                 <div className="flex items-center justify-between pt-2 border-t border-border/50">
                   <div className="flex items-center gap-2 text-sm">
                     <Users className="w-4 h-4 text-primary" />
                     <span className="font-medium">{route.seats} seats</span>
                   </div>
+
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <User className="w-4 h-4" />
-                    <span>{route.driver}</span>
+                    <span>{route.users?.email || "Unknown"}</span>
                   </div>
                 </div>
 
-                {/* Join Button */}
                 <Button 
                   variant="neon" 
                   className="w-full group-hover:scale-105 transition-transform"
@@ -175,7 +183,7 @@ const BrowseRoutes = () => {
         )}
       </div>
 
-      {/* Route Detail Dialog */}
+      {/* Route Details Modal */}
       <Dialog open={!!selectedRoute} onOpenChange={() => setSelectedRoute(null)}>
         <DialogContent className="glass border border-border/50 max-w-md">
           <DialogHeader>
@@ -187,48 +195,55 @@ const BrowseRoutes = () => {
 
           {selectedRoute && (
             <div className="space-y-6 pt-4">
-              {/* Route Path */}
+              
               <div className="space-y-4">
+                {/* Start */}
                 <div className="flex items-start gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+                  <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center">
                     <MapPin className="w-6 h-6 text-primary" />
                   </div>
                   <div>
                     <div className="text-sm text-muted-foreground mb-1">Starting Point</div>
-                    <div className="font-semibold text-lg">{selectedRoute.from}</div>
+                    <div className="font-semibold text-lg">{selectedRoute.start_location}</div>
                   </div>
                 </div>
 
                 <div className="ml-6 border-l-2 border-dashed border-border h-8" />
 
+                {/* Destination */}
                 <div className="flex items-start gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-secondary/20 flex items-center justify-center flex-shrink-0">
+                  <div className="w-12 h-12 rounded-xl bg-secondary/20 flex items-center justify-center">
                     <MapPin className="w-6 h-6 text-secondary" />
                   </div>
                   <div>
                     <div className="text-sm text-muted-foreground mb-1">Destination</div>
-                    <div className="font-semibold text-lg">{selectedRoute.to}</div>
+                    <div className="font-semibold text-lg">{selectedRoute.end_location}</div>
                   </div>
                 </div>
               </div>
 
-              {/* Additional Info */}
+              {/* Info Block */}
               <div className="glass p-4 rounded-xl space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Departure</span>
-                  <span className="font-medium">{formatTime(selectedRoute.time)}</span>
+                  <span className="font-medium">
+                    {formatDateTime(selectedRoute.date, selectedRoute.time)}
+                  </span>
                 </div>
+
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Available Seats</span>
+                  <span className="text-muted-foreground">Seats</span>
                   <span className="font-medium">{selectedRoute.seats}</span>
                 </div>
+
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Driver</span>
-                  <span className="font-medium">{selectedRoute.driver}</span>
+                  <span className="font-medium">
+                    {selectedRoute.users?.email || "Unknown"}
+                  </span>
                 </div>
               </div>
 
-              {/* Actions */}
               <div className="flex gap-3">
                 <Button 
                   variant="glass" 
@@ -245,6 +260,7 @@ const BrowseRoutes = () => {
                   Join Route
                 </Button>
               </div>
+
             </div>
           )}
         </DialogContent>

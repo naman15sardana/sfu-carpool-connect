@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, MapPin, Calendar, Users } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "../lib/supabase";
 
 const CreateRoute = () => {
   const navigate = useNavigate();
@@ -14,39 +15,56 @@ const CreateRoute = () => {
   const [departureTime, setDepartureTime] = useState("");
   const [seats, setSeats] = useState("");
 
-  const handleSubmit = () => {
-    if (startLocation && destination && departureTime && seats) {
-      const newRoute = {
-        id: Date.now(),
-        from: startLocation,
-        to: destination,
-        time: departureTime,
-        seats: parseInt(seats),
-        driver: localStorage.getItem("userName") || "Anonymous",
-      };
-
-      const existingRoutes = JSON.parse(localStorage.getItem("routes") || "[]");
-      // Add new route at the beginning so it appears first
-      localStorage.setItem("routes", JSON.stringify([newRoute, ...existingRoutes]));
-      
-      toast({
-        title: "Route published successfully!",
-        description: "Students can now find and join your ride.",
-      });
-      
-      setTimeout(() => navigate("/browse-routes"), 1500);
-    } else {
+  const handleSubmit = async () => {
+    if (!startLocation || !destination || !departureTime || !seats) {
       toast({
         title: "Error",
         description: "Please fill in all fields",
         variant: "destructive",
       });
+      return;
     }
+
+    // 🔥 Get current user
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData.user;
+
+    if (!user) {
+      toast({
+        title: "Not Logged In",
+        description: "Please log in before creating a route.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const { error } = await supabase.from("rides").insert({
+      driver_id: user.id,
+      from_location: startLocation,
+      to_location: destination,
+      departure_time: departureTime,
+      seats_available: Number(seats),
+    });
+
+    if (error) {
+      toast({
+        title: "Error Creating Route",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: "Route published successfully!",
+      description: "Students can now find and join your ride.",
+    });
+
+    setTimeout(() => navigate("/browse-routes"), 1200);
   };
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="border-b border-border/50 glass sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4">
           <Button 
@@ -71,32 +89,32 @@ const CreateRoute = () => {
         </div>
 
         <div className="glass p-8 rounded-2xl border border-border/50 space-y-6">
-          {/* Starting Location */}
+
+          {/* Start Location */}
           <div className="space-y-2">
-            <Label htmlFor="start" className="flex items-center gap-2 text-foreground">
+            <Label className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-primary" />
               Starting Location
             </Label>
             <Input
-              id="start"
-              placeholder="e.g., Downtown Vancouver, Metrotown"
+              placeholder="e.g., Downtown Vancouver"
               value={startLocation}
               onChange={(e) => setStartLocation(e.target.value)}
-              className="glass border-border/50 focus:border-primary transition-all"
             />
           </div>
 
           {/* Destination */}
           <div className="space-y-2">
-            <Label htmlFor="destination" className="flex items-center gap-2 text-foreground">
+            <Label className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-secondary" />
               Destination
             </Label>
+
             <Select value={destination} onValueChange={setDestination}>
-              <SelectTrigger className="glass border-border/50 focus:border-primary">
+              <SelectTrigger>
                 <SelectValue placeholder="Select SFU Campus" />
               </SelectTrigger>
-              <SelectContent className="glass border-border/50">
+              <SelectContent>
                 <SelectItem value="SFU Burnaby">SFU Burnaby</SelectItem>
                 <SelectItem value="SFU Surrey">SFU Surrey</SelectItem>
                 <SelectItem value="SFU Vancouver">SFU Vancouver</SelectItem>
@@ -106,38 +124,33 @@ const CreateRoute = () => {
 
           {/* Departure Time */}
           <div className="space-y-2">
-            <Label htmlFor="time" className="flex items-center gap-2 text-foreground">
+            <Label className="flex items-center gap-2">
               <Calendar className="w-4 h-4 text-accent" />
               Departure Time
             </Label>
             <Input
-              id="time"
               type="datetime-local"
               value={departureTime}
               onChange={(e) => setDepartureTime(e.target.value)}
-              className="glass border-border/50 focus:border-primary transition-all"
             />
           </div>
 
-          {/* Number of Seats */}
+          {/* Seats */}
           <div className="space-y-2">
-            <Label htmlFor="seats" className="flex items-center gap-2 text-foreground">
+            <Label className="flex items-center gap-2">
               <Users className="w-4 h-4 text-primary" />
               Available Seats
             </Label>
             <Input
-              id="seats"
               type="number"
               min="1"
               max="7"
-              placeholder="How many passengers can you take?"
               value={seats}
               onChange={(e) => setSeats(e.target.value)}
-              className="glass border-border/50 focus:border-primary transition-all"
             />
           </div>
 
-          {/* Submit Button */}
+          {/* Submit */}
           <Button 
             size="lg" 
             variant="neon"
@@ -147,10 +160,6 @@ const CreateRoute = () => {
             <MapPin className="w-5 h-5" />
             Publish Route
           </Button>
-
-          <p className="text-sm text-muted-foreground text-center">
-            Your contact info will be shared with students who join your ride
-          </p>
         </div>
       </div>
     </div>
