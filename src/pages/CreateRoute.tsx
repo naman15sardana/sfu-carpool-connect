@@ -25,7 +25,7 @@ const CreateRoute = () => {
       return;
     }
 
-    // 🔥 Get current user
+    // 👉 Get logged in user
     const { data: userData } = await supabase.auth.getUser();
     const user = userData.user;
 
@@ -38,11 +38,12 @@ const CreateRoute = () => {
       return;
     }
 
+    // 👉 Insert row in Supabase
     const { error } = await supabase.from("rides").insert({
       driver_id: user.id,
       from_location: startLocation,
       to_location: destination,
-      departure_time: departureTime,
+      departure_time: departureTime, // ISO datetime
       seats_available: Number(seats),
     });
 
@@ -65,6 +66,7 @@ const CreateRoute = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Header */}
       <header className="border-b border-border/50 glass sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4">
           <Button 
@@ -89,8 +91,8 @@ const CreateRoute = () => {
         </div>
 
         <div className="glass p-8 rounded-2xl border border-border/50 space-y-6">
-
-          {/* Start Location */}
+          
+          {/* START LOCATION */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-primary" />
@@ -103,7 +105,7 @@ const CreateRoute = () => {
             />
           </div>
 
-          {/* Destination */}
+          {/* DESTINATION */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-secondary" />
@@ -122,20 +124,34 @@ const CreateRoute = () => {
             </Select>
           </div>
 
-          {/* Departure Time */}
+          {/* DATE + TIME PICKER — FIXED VERSION */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <Calendar className="w-4 h-4 text-accent" />
               Departure Time
             </Label>
-            <Input
+
+            {/* 👉 IMPORTANT: Use raw input instead of ShadCN Input */}
+            <input
               type="datetime-local"
               value={departureTime}
               onChange={(e) => setDepartureTime(e.target.value)}
+              className="
+                w-full 
+                p-3 
+                rounded-md 
+                bg-background 
+                border 
+                border-border/50 
+                text-foreground 
+                focus:border-primary 
+                focus:ring-2 
+                focus:ring-primary/50
+              "
             />
           </div>
 
-          {/* Seats */}
+          {/* SEATS */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <Users className="w-4 h-4 text-primary" />
@@ -150,7 +166,7 @@ const CreateRoute = () => {
             />
           </div>
 
-          {/* Submit */}
+          {/* SUBMIT */}
           <Button 
             size="lg" 
             variant="neon"
@@ -160,6 +176,7 @@ const CreateRoute = () => {
             <MapPin className="w-5 h-5" />
             Publish Route
           </Button>
+
         </div>
       </div>
     </div>
