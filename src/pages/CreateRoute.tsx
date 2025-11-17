@@ -25,7 +25,7 @@ const CreateRoute = () => {
       return;
     }
 
-    // 👉 Get logged in user
+    // Get logged in user
     const { data: userData } = await supabase.auth.getUser();
     const user = userData.user;
 
@@ -38,12 +38,14 @@ const CreateRoute = () => {
       return;
     }
 
-    // 👉 Insert row in Supabase
+    const iso = departureTime; // "YYYY-MM-DDTHH:MM"
+
     const { error } = await supabase.from("rides").insert({
       driver_id: user.id,
       from_location: startLocation,
       to_location: destination,
-      departure_time: departureTime, // ISO datetime
+      date: iso.split("T")[0],  // YYYY-MM-DD
+      time: iso.split("T")[1],  // HH:MM
       seats_available: Number(seats),
     });
 
@@ -66,7 +68,6 @@ const CreateRoute = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="border-b border-border/50 glass sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4">
           <Button 
@@ -91,8 +92,8 @@ const CreateRoute = () => {
         </div>
 
         <div className="glass p-8 rounded-2xl border border-border/50 space-y-6">
-          
-          {/* START LOCATION */}
+
+          {/* Start Location */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-primary" />
@@ -105,7 +106,7 @@ const CreateRoute = () => {
             />
           </div>
 
-          {/* DESTINATION */}
+          {/* Destination */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-secondary" />
@@ -124,34 +125,27 @@ const CreateRoute = () => {
             </Select>
           </div>
 
-          {/* DATE + TIME PICKER — FIXED VERSION */}
+          {/* Departure Time */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <Calendar className="w-4 h-4 text-accent" />
               Departure Time
             </Label>
 
-            {/* 👉 IMPORTANT: Use raw input instead of ShadCN Input */}
             <input
               type="datetime-local"
               value={departureTime}
               onChange={(e) => setDepartureTime(e.target.value)}
               className="
-                w-full 
-                p-3 
-                rounded-md 
-                bg-background 
-                border 
-                border-border/50 
-                text-foreground 
-                focus:border-primary 
-                focus:ring-2 
-                focus:ring-primary/50
+                w-full p-3 rounded-md bg-background 
+                border border-border/50 text-foreground
+                focus:border-primary focus:ring-2 focus:ring-primary/50
+                [appearance:auto] [-webkit-appearance:textfield]
               "
             />
           </div>
 
-          {/* SEATS */}
+          {/* Seats */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <Users className="w-4 h-4 text-primary" />
@@ -166,7 +160,7 @@ const CreateRoute = () => {
             />
           </div>
 
-          {/* SUBMIT */}
+          {/* Submit */}
           <Button 
             size="lg" 
             variant="neon"
