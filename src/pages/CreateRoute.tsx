@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, MapPin, Calendar, Users } from "lucide-react";
 import {
@@ -16,25 +16,72 @@ import { supabase } from "../lib/supabase";
 
 const CreateRoute = () => {
   const navigate = useNavigate();
+
+  // -------------------------------
+  // 🔥 Form State
+  // -------------------------------
   const [startLocation, setStartLocation] = useState("");
+  const [startCoords, setStartCoords] = useState<{ lat: number; lng: number } | null>(null);
+
+  const startInputRef = useRef<HTMLInputElement | null>(null);
+
   const [destination, setDestination] = useState("");
   const [departureTime, setDepartureTime] = useState("");
   const [seats, setSeats] = useState("");
 
   // -------------------------------
-  // 🔥 CREATE ROUTE SUBMIT HANDLER
+  // 🔥 Google Places Autocomplete
+  // -------------------------------
+  useEffect(() => {
+    if (!startInputRef.current) return;
+
+    const autocomplete = new google.maps.places.Autocomplete(startInputRef.current!, {
+      types: ["geocode"],
+      componentRestrictions: { country: ["ca"] },
+    });
+
+    autocomplete.addListener("place_changed", () => {
+      const place = autocomplete.getPlace();
+
+      if (!place.geometry) {
+        toast({
+          title: "Invalid Location",
+          description: "Please select a valid place from the dropdown.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const lat = place.geometry.location?.lat();
+      const lng = place.geometry.location?.lng();
+
+      setStartCoords({ lat, lng });
+      setStartLocation(place.formatted_address || place.name || "");
+    });
+  }, []);
+
+  // -------------------------------
+  // 🔥 Submit Handler
   // -------------------------------
   const handleSubmit = async () => {
     if (!startLocation || !destination || !departureTime || !seats) {
       toast({
-        title: "Error",
-        description: "Please fill in all fields",
+        title: "Missing Fields",
+        description: "Please fill in all fields.",
         variant: "destructive",
       });
       return;
     }
 
-    // 🔥 Get logged in user
+    if (!startCoords) {
+      toast({
+        title: "Location Required",
+        description: "Please choose a valid location from the autocomplete dropdown.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const { data: userData } = await supabase.auth.getUser();
     const user = userData.user;
 
@@ -47,10 +94,7 @@ const CreateRoute = () => {
       return;
     }
 
-    // -------------------------------
-    // 🔥 Convert datetime-local → date + time
-    // -------------------------------
-    const iso = departureTime; // "YYYY-MM-DDTHH:MM"
+    const iso = departureTime;
     const date = iso.split("T")[0];
     const time = iso.split("T")[1];
 
@@ -58,11 +102,13 @@ const CreateRoute = () => {
     // 🔥 Insert into Supabase
     // -------------------------------
     const { error } = await supabase.from("rides").insert({
-      driver_id: user.id,          
+      driver_id: user.id,
       start_location: startLocation,
+      start_lat: startCoords.lat,
+      start_lng: startCoords.lng,
       end_location: destination,
-      date: date,
-      time: time,
+      date,
+      time,
       seats_available: Number(seats),
     });
 
@@ -87,11 +133,7 @@ const CreateRoute = () => {
     <div className="min-h-screen bg-background">
       <header className="border-b border-border/50 glass sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4">
-          <Button
-            variant="ghost"
-            onClick={() => navigate("/dashboard")}
-            className="gap-2"
-          >
+          <Button variant="ghost" onClick={() => navigate("/dashboard")} className="gap-2">
             <ArrowLeft className="w-4 h-4" />
             Back to Dashboard
           </Button>
@@ -104,7 +146,7 @@ const CreateRoute = () => {
             Create a <span className="text-gradient">Route</span>
           </h1>
           <p className="text-muted-foreground text-lg">
-            Share your ride and help fellow students commute
+            Share your ride and help fellow students commute.
           </p>
         </div>
 
@@ -117,7 +159,8 @@ const CreateRoute = () => {
               Starting Location
             </Label>
             <Input
-              placeholder="e.g., Surrey Central Station"
+              placeholder="Search location..."
+              ref={startInputRef}
               value={startLocation}
               onChange={(e) => setStartLocation(e.target.value)}
             />
@@ -129,7 +172,6 @@ const CreateRoute = () => {
               <MapPin className="w-4 h-4 text-secondary" />
               Destination
             </Label>
-
             <Select value={destination} onValueChange={setDestination}>
               <SelectTrigger>
                 <SelectValue placeholder="Select SFU Campus" />
@@ -148,17 +190,11 @@ const CreateRoute = () => {
               <Calendar className="w-4 h-4 text-accent" />
               Departure Time
             </Label>
-
             <input
               type="datetime-local"
               value={departureTime}
               onChange={(e) => setDepartureTime(e.target.value)}
-              className="
-                w-full p-3 rounded-md bg-background 
-                border border-border/50 text-foreground
-                focus:border-primary focus:ring-2 focus:ring-primary/50
-                [appearance:auto] [-webkit-appearance:textfield]
-              "
+              className="w-full p-3 rounded-md bg-background border border-border/50 text-foreground"
             />
           </div>
 
@@ -177,7 +213,6 @@ const CreateRoute = () => {
             />
           </div>
 
-          {/* Submit */}
           <Button
             size="lg"
             variant="neon"
