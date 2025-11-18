@@ -18,11 +18,10 @@ const CreateRoute = () => {
   const navigate = useNavigate();
 
   // -------------------------------
-  // 🔥 Form State
+  // Form State
   // -------------------------------
   const [startLocation, setStartLocation] = useState("");
   const [startCoords, setStartCoords] = useState<{ lat: number; lng: number } | null>(null);
-
   const startInputRef = useRef<HTMLInputElement | null>(null);
 
   const [destination, setDestination] = useState("");
@@ -30,7 +29,7 @@ const CreateRoute = () => {
   const [seats, setSeats] = useState("");
 
   // -------------------------------
-  // 🔥 Google Places Autocomplete
+  // Google Autocomplete (WORKING VERSION)
   // -------------------------------
   useEffect(() => {
     if (!startInputRef.current) return;
@@ -61,7 +60,7 @@ const CreateRoute = () => {
   }, []);
 
   // -------------------------------
-  // 🔥 Submit Handler
+  // Submit Handler (NO CAMPUS COORDINATES)
   // -------------------------------
   const handleSubmit = async () => {
     if (!startLocation || !destination || !departureTime || !seats) {
@@ -76,7 +75,7 @@ const CreateRoute = () => {
     if (!startCoords) {
       toast({
         title: "Location Required",
-        description: "Please choose a valid location from the autocomplete dropdown.",
+        description: "Please choose a location from autocomplete.",
         variant: "destructive",
       });
       return;
@@ -98,15 +97,12 @@ const CreateRoute = () => {
     const date = iso.split("T")[0];
     const time = iso.split("T")[1];
 
-    // -------------------------------
-    // 🔥 Insert into Supabase
-    // -------------------------------
     const { error } = await supabase.from("rides").insert({
       driver_id: user.id,
       start_location: startLocation,
       start_lat: startCoords.lat,
       start_lng: startCoords.lng,
-      end_location: destination,
+      end_location: destination, // Just save name
       date,
       time,
       seats_available: Number(seats),
@@ -141,19 +137,14 @@ const CreateRoute = () => {
       </header>
 
       <div className="container mx-auto px-6 py-12 max-w-2xl">
-        <div className="mb-8 animate-fade-in">
-          <h1 className="text-4xl font-bold mb-2">
-            Create a <span className="text-gradient">Route</span>
-          </h1>
-          <p className="text-muted-foreground text-lg">
-            Share your ride and help fellow students commute.
-          </p>
-        </div>
+        <h1 className="text-4xl font-bold mb-4">
+          Create a <span className="text-gradient">Route</span>
+        </h1>
 
         <div className="glass p-8 rounded-2xl border border-border/50 space-y-6">
 
           {/* Start Location */}
-          <div className="space-y-2">
+          <div>
             <Label className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-primary" />
               Starting Location
@@ -167,7 +158,7 @@ const CreateRoute = () => {
           </div>
 
           {/* Destination */}
-          <div className="space-y-2">
+          <div>
             <Label className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-secondary" />
               Destination
@@ -185,7 +176,7 @@ const CreateRoute = () => {
           </div>
 
           {/* Departure Time */}
-          <div className="space-y-2">
+          <div>
             <Label className="flex items-center gap-2">
               <Calendar className="w-4 h-4 text-accent" />
               Departure Time
@@ -194,12 +185,12 @@ const CreateRoute = () => {
               type="datetime-local"
               value={departureTime}
               onChange={(e) => setDepartureTime(e.target.value)}
-              className="w-full p-3 rounded-md bg-background border border-border/50 text-foreground"
+              className="w-full p-3 rounded-md bg-background border border-border/50"
             />
           </div>
 
           {/* Seats */}
-          <div className="space-y-2">
+          <div>
             <Label className="flex items-center gap-2">
               <Users className="w-4 h-4 text-primary" />
               Available Seats
@@ -213,12 +204,7 @@ const CreateRoute = () => {
             />
           </div>
 
-          <Button
-            size="lg"
-            variant="neon"
-            className="w-full gap-2"
-            onClick={handleSubmit}
-          >
+          <Button size="lg" variant="neon" className="w-full gap-2" onClick={handleSubmit}>
             <MapPin className="w-5 h-5" />
             Publish Route
           </Button>
