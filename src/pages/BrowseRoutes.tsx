@@ -34,7 +34,7 @@ const BrowseRoutes = () => {
   const [routes, setRoutes] = useState<Route[]>([]);
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
 
-  // 🔥 Filter + Sort State
+  // 🔥 Filters
   const [filterCampus, setFilterCampus] = useState("all");
   const [filterDate, setFilterDate] = useState("");
   const [sortBy, setSortBy] = useState("time");
@@ -123,7 +123,7 @@ const BrowseRoutes = () => {
   };
 
   // --------------------------
-  // 🧠 HAVERSINE — Distance Between Two Coordinates
+  // HAVERSINE — Distance Between Two Coordinates
   // --------------------------
   const getDistanceKm = (lat1: number, lng1: number, lat2: number, lng2: number) => {
     const R = 6371;
@@ -139,13 +139,20 @@ const BrowseRoutes = () => {
   };
 
   // --------------------------
-  // APPLY FILTERS + SORTING
+  // APPLY FILTERS + REMOVE PAST RIDES + SORT
   // --------------------------
   const filteredRoutes = routes
-    // Campus filter
+    // 🔹 Remove past rides
+    .filter((r) => {
+      const rideDate = new Date(`${r.date}T${r.time}`);
+      const now = new Date();
+      return rideDate.getTime() >= now.getTime();
+    })
+
+    // 🔹 Destination filter
     .filter((r) => (filterCampus === "all" ? true : r.end_location === filterCampus))
 
-    // Smart "nearby start" filter
+    // 🔹 Smart "nearby start" filter
     .filter((r) => {
       if (!filterStartCoords) return true;
       if (!r.start_lat || !r.start_lng) return false;
@@ -157,13 +164,13 @@ const BrowseRoutes = () => {
         r.start_lng
       );
 
-      return dist <= 8; // within 8 km
+      return dist <= 8; // within 8 km radius
     })
 
-    // Date filter
+    // 🔹 Date filter
     .filter((r) => (filterDate ? r.date === filterDate : true))
 
-    // Sorting
+    // 🔹 Sorting
     .sort((a, b) => {
       if (sortBy === "time") {
         return (
@@ -175,17 +182,16 @@ const BrowseRoutes = () => {
       return 0;
     });
 
+  // --------------------------
+  // UI RENDER
+  // --------------------------
   return (
     <div className="min-h-screen bg-background">
 
       {/* HEADER */}
       <header className="border-b border-border/50 glass sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4">
-          <Button
-            variant="ghost"
-            onClick={() => navigate("/dashboard")}
-            className="gap-2"
-          >
+          <Button variant="ghost" onClick={() => navigate("/dashboard")} className="gap-2">
             <ArrowLeft className="w-4 h-4" />
             Back to Dashboard
           </Button>
