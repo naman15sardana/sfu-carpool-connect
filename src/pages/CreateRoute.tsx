@@ -14,6 +14,13 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "../lib/supabase";
 
+// ⭐ Predefined SFU campus coordinates
+const SFU_CAMPUSES: Record<string, { lat: number; lng: number }> = {
+  "SFU Burnaby": { lat: 49.2775, lng: -122.9156 },
+  "SFU Surrey": { lat: 49.1877, lng: -122.8490 },
+  "SFU Vancouver": { lat: 49.2846, lng: -123.1119 },
+};
+
 const CreateRoute = () => {
   const navigate = useNavigate();
 
@@ -23,9 +30,11 @@ const CreateRoute = () => {
   const [startLocation, setStartLocation] = useState("");
   const [startCoords, setStartCoords] = useState<{ lat: number; lng: number } | null>(null);
 
+  const [destination, setDestination] = useState("");
+  const [endCoords, setEndCoords] = useState<{ lat: number; lng: number } | null>(null);
+
   const startInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [destination, setDestination] = useState("");
   const [departureTime, setDepartureTime] = useState("");
   const [seats, setSeats] = useState("");
 
@@ -42,11 +51,10 @@ const CreateRoute = () => {
 
     autocomplete.addListener("place_changed", () => {
       const place = autocomplete.getPlace();
-
       if (!place.geometry) {
         toast({
           title: "Invalid Location",
-          description: "Please select a valid place from the dropdown.",
+          description: "Please select a valid place from suggestions.",
           variant: "destructive",
         });
         return;
@@ -55,10 +63,21 @@ const CreateRoute = () => {
       const lat = place.geometry.location?.lat();
       const lng = place.geometry.location?.lng();
 
-      setStartCoords({ lat, lng });
-      setStartLocation(place.formatted_address || place.name || "");
+      if (lat && lng) {
+        setStartCoords({ lat, lng });
+        setStartLocation(place.formatted_address || place.name || "");
+      }
     });
   }, []);
+
+  // -------------------------------
+  // 🔥 Assign END CAMPUS LAT/LNG
+  // -------------------------------
+  useEffect(() => {
+    if (destination && SFU_CAMPUSES[destination]) {
+      setEndCoords(SFU_CAMPUSES[destination]);
+    }
+  }, [destination]);
 
   // -------------------------------
   // 🔥 Submit Handler
@@ -76,7 +95,16 @@ const CreateRoute = () => {
     if (!startCoords) {
       toast({
         title: "Location Required",
-        description: "Please choose a valid location from the autocomplete dropdown.",
+        description: "Please pick the starting location from autocomplete.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!endCoords) {
+      toast({
+        title: "Destination Error",
+        description: "Invalid SFU campus.",
         variant: "destructive",
       });
       return;
@@ -103,10 +131,16 @@ const CreateRoute = () => {
     // -------------------------------
     const { error } = await supabase.from("rides").insert({
       driver_id: user.id,
+
+      // FULL location data
       start_location: startLocation,
       start_lat: startCoords.lat,
       start_lng: startCoords.lng,
+
       end_location: destination,
+      end_lat: endCoords.lat,
+      end_lng: endCoords.lng,
+
       date,
       time,
       seats_available: Number(seats),
@@ -126,7 +160,7 @@ const CreateRoute = () => {
       description: "Your ride is now visible to other students.",
     });
 
-    setTimeout(() => navigate("/browse-routes"), 1200);
+    setTimeout(() => navigate("/browse-routes"), 1000);
   };
 
   return (
@@ -166,7 +200,7 @@ const CreateRoute = () => {
             />
           </div>
 
-          {/* Destination */}
+          {/* Destination Campus */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-secondary" />
@@ -213,12 +247,7 @@ const CreateRoute = () => {
             />
           </div>
 
-          <Button
-            size="lg"
-            variant="neon"
-            className="w-full gap-2"
-            onClick={handleSubmit}
-          >
+          <Button size="lg" variant="neon" className="w-full gap-2" onClick={handleSubmit}>
             <MapPin className="w-5 h-5" />
             Publish Route
           </Button>
