@@ -1,22 +1,32 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, MapPin, Clock, Users, User } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectValue,
+  SelectItem,
+} from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "../lib/supabase";
 
+// --------------------------
+// ROUTE TYPE
+// --------------------------
 interface Route {
   id: string;
   start_location: string;
+  start_lat: number | null;
+  start_lng: number | null;
   end_location: string;
   date: string;
   time: string;
   seats_available: number;
   driver_id: string;
-  driver: {
-    email: string;
-  } | null;
+  driver: { email: string } | null;
 }
 
 const BrowseRoutes = () => {
@@ -24,6 +34,42 @@ const BrowseRoutes = () => {
   const [routes, setRoutes] = useState<Route[]>([]);
   const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
 
+  // 🔥 Filter + Sort State
+  const [filterCampus, setFilterCampus] = useState("all");
+  const [filterDate, setFilterDate] = useState("");
+  const [sortBy, setSortBy] = useState("time");
+
+  // Smart start filter
+  const [filterStartCoords, setFilterStartCoords] =
+    useState<{ lat: number; lng: number } | null>(null);
+
+  const filterStartRef = useRef<HTMLInputElement | null>(null);
+
+  // --------------------------
+  // GOOGLE AUTOCOMPLETE FOR "Starting near"
+  // --------------------------
+  useEffect(() => {
+    if (!filterStartRef.current) return;
+
+    const autocomplete = new google.maps.places.Autocomplete(filterStartRef.current!, {
+      types: ["geocode"],
+      componentRestrictions: { country: ["ca"] },
+    });
+
+    autocomplete.addListener("place_changed", () => {
+      const place = autocomplete.getPlace();
+      if (!place.geometry) return;
+
+      setFilterStartCoords({
+        lat: place.geometry.location.lat(),
+        lng: place.geometry.location.lng(),
+      });
+    });
+  }, []);
+
+  // --------------------------
+  // FETCH ROUTES
+  // --------------------------
   useEffect(() => {
     const fetchRoutes = async () => {
       const { data, error } = await supabase
@@ -31,20 +77,19 @@ const BrowseRoutes = () => {
         .select(`
           id,
           start_location,
+          start_lat,
+          start_lng,
           end_location,
           date,
           time,
           seats_available,
           driver_id,
-          driver:profiles (
-            email
-          )
+          driver:profiles ( email )
         `)
         .order("date", { ascending: true })
         .order("time", { ascending: true });
 
       if (error) {
-        console.error(error);
         toast({
           title: "Error loading routes",
           description: error.message,
@@ -77,9 +122,63 @@ const BrowseRoutes = () => {
     setSelectedRoute(null);
   };
 
+  // --------------------------
+  // 🧠 HAVERSINE — Distance Between Two Coordinates
+  // --------------------------
+  const getDistanceKm = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLng = ((lng2 - lng1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(lat1 * Math.PI / 180) *
+      Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLng / 2) ** 2;
+
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  };
+
+  // --------------------------
+  // APPLY FILTERS + SORTING
+  // --------------------------
+  const filteredRoutes = routes
+    // Campus filter
+    .filter((r) => (filterCampus === "all" ? true : r.end_location === filterCampus))
+
+    // Smart "nearby start" filter
+    .filter((r) => {
+      if (!filterStartCoords) return true;
+      if (!r.start_lat || !r.start_lng) return false;
+
+      const dist = getDistanceKm(
+        filterStartCoords.lat,
+        filterStartCoords.lng,
+        r.start_lat,
+        r.start_lng
+      );
+
+      return dist <= 8; // within 8 km
+    })
+
+    // Date filter
+    .filter((r) => (filterDate ? r.date === filterDate : true))
+
+    // Sorting
+    .sort((a, b) => {
+      if (sortBy === "time") {
+        return (
+          new Date(a.date + "T" + a.time).getTime() -
+          new Date(b.date + "T" + b.time).getTime()
+        );
+      }
+      if (sortBy === "seats") return b.seats_available - a.seats_available;
+      return 0;
+    });
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
+
+      {/* HEADER */}
       <header className="border-b border-border/50 glass sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4">
           <Button
@@ -94,19 +193,64 @@ const BrowseRoutes = () => {
       </header>
 
       <div className="container mx-auto px-6 py-12">
-        <h1 className="text-4xl font-bold mb-4">
+
+        <h1 className="text-4xl font-bold mb-6">
           Browse <span className="text-gradient">Routes</span>
         </h1>
 
+        {/* FILTER BAR */}
+        <div className="flex flex-col md:flex-row gap-4 mb-8">
+
+          {/* START NEAR FILTER */}
+          <input
+            placeholder="Starting near..."
+            ref={filterStartRef}
+            className="p-3 rounded-md bg-background border border-border/50 w-[200px]"
+          />
+
+          {/* CAMPUS FILTER */}
+          <Select value={filterCampus} onValueChange={setFilterCampus}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="To (Campus)" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Campuses</SelectItem>
+              <SelectItem value="SFU Burnaby">SFU Burnaby</SelectItem>
+              <SelectItem value="SFU Surrey">SFU Surrey</SelectItem>
+              <SelectItem value="SFU Vancouver">SFU Vancouver</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* DATE FILTER */}
+          <input
+            type="date"
+            value={filterDate}
+            onChange={(e) => setFilterDate(e.target.value)}
+            className="p-3 rounded-md bg-background border border-border/50 w-[200px]"
+          />
+
+          {/* SORT FILTER */}
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Sort" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="time">Earliest Departure</SelectItem>
+              <SelectItem value="seats">Most Seats</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* ROUTES GRID */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {routes.map((route) => (
+          {filteredRoutes.map((route) => (
             <div
               key={route.id}
               className="glass p-6 rounded-2xl border border-border/50 hover:border-primary/50 transition cursor-pointer"
               onClick={() => setSelectedRoute(route)}
             >
               <div className="space-y-4">
-                {/* FROM */}
+
                 <div className="flex items-center gap-3">
                   <MapPin className="w-5 h-5 text-primary" />
                   <div>
@@ -115,7 +259,6 @@ const BrowseRoutes = () => {
                   </div>
                 </div>
 
-                {/* TO */}
                 <div className="flex items-center gap-3">
                   <MapPin className="w-5 h-5 text-secondary" />
                   <div>
@@ -124,13 +267,11 @@ const BrowseRoutes = () => {
                   </div>
                 </div>
 
-                {/* DATE + TIME */}
                 <div className="flex items-center gap-2 text-sm">
                   <Clock className="w-4 h-4 text-accent" />
                   <span>{formatDateTime(route.date, route.time)}</span>
                 </div>
 
-                {/* SEATS + DRIVER */}
                 <div className="flex items-center justify-between pt-2 border-t border-border/50">
                   <div className="flex items-center gap-2 text-sm">
                     <Users className="w-4 h-4 text-primary" />
@@ -151,16 +292,9 @@ const BrowseRoutes = () => {
           ))}
         </div>
 
-        {routes.length === 0 && (
+        {filteredRoutes.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-muted-foreground text-lg">No routes available yet.</p>
-            <Button
-              variant="neon"
-              className="mt-4"
-              onClick={() => navigate("/create-route")}
-            >
-              Create First Route
-            </Button>
+            <p className="text-muted-foreground text-lg">No routes found.</p>
           </div>
         )}
       </div>
@@ -174,7 +308,7 @@ const BrowseRoutes = () => {
 
           {selectedRoute && (
             <div className="space-y-6">
-              {/* FROM */}
+
               <div className="flex items-start gap-3">
                 <MapPin className="w-6 h-6 text-primary" />
                 <div>
@@ -183,7 +317,6 @@ const BrowseRoutes = () => {
                 </div>
               </div>
 
-              {/* TO */}
               <div className="flex items-start gap-3">
                 <MapPin className="w-6 h-6 text-secondary" />
                 <div>
@@ -192,7 +325,6 @@ const BrowseRoutes = () => {
                 </div>
               </div>
 
-              {/* DETAILS */}
               <div className="glass p-4 rounded-xl space-y-3">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Departure</span>
